@@ -1288,5 +1288,185 @@
         "flags": "Cadena de comandos con <b>&&</b>: solo continúa si el paso anterior funcionó."
       }
     ]
+  },
+  {
+    "id": "usuarios",
+    "title": "Gestión de usuarios",
+    "desc": "Crear, modificar y eliminar usuarios y grupos. Contraseñas, bloqueos, sudo y auditoría de acceso.",
+    "items": [
+      {
+        "cmd": "adduser nombre",
+        "desc": "Crea un nuevo usuario de forma interactiva: pide contraseña, nombre completo y datos extra.",
+        "flags": "Versión más amigable de <b>useradd</b>. Crea home, grupo y copia los archivos de /etc/skel automáticamente."
+      },
+      {
+        "cmd": "useradd -m -s /bin/bash nombre",
+        "desc": "Crea un usuario sin interacción: <b>-m</b> crea el directorio home, <b>-s</b> define el shell.",
+        "flags": "<b>-m</b> → crea /home/nombre · <b>-s /bin/bash</b> → shell por defecto · <b>-G grupo</b> → agrega a grupos adicionales"
+      },
+      {
+        "cmd": "passwd nombre",
+        "desc": "Establece o cambia la contraseña de un usuario. Sin argumento cambia la del usuario actual.",
+        "flags": "Requiere sudo para cambiar la de otro usuario."
+      },
+      {
+        "cmd": "passwd -e nombre",
+        "desc": "Expira la contraseña del usuario: lo fuerza a cambiarla en el próximo inicio de sesión.",
+        "flags": "<b>-e</b> → expire. Útil para reseteos de contraseña controlados."
+      },
+      {
+        "cmd": "usermod -L nombre",
+        "desc": "Bloquea la cuenta del usuario sin eliminarla. La sesión SSH activa no se corta de inmediato.",
+        "flags": "<b>-L</b> → lock. Añade un <b>!</b> al hash de contraseña en /etc/shadow.",
+        "warn": "No cierra sesiones SSH ya establecidas. Usa pkill o PAM para forzar cierre."
+      },
+      {
+        "cmd": "usermod -U nombre",
+        "desc": "Desbloquea una cuenta previamente bloqueada con <b>usermod -L</b>.",
+        "flags": "<b>-U</b> → unlock. Elimina el <b>!</b> del hash en /etc/shadow."
+      },
+      {
+        "cmd": "passwd -l nombre",
+        "desc": "Alternativa a usermod -L para bloquear: deshabilita la contraseña poniendo el prefijo <b>!</b>.",
+        "flags": "<b>-l</b> → lock · <b>passwd -u nombre</b> para desbloquear con este método."
+      },
+      {
+        "cmd": "chage -l nombre",
+        "desc": "Muestra la política de expiración de contraseña: último cambio, vencimiento, inactividad.",
+        "flags": "<b>-M días</b> → máximo de días antes de expirar · <b>-I días</b> → días de inactividad antes de deshabilitar cuenta"
+      },
+      {
+        "cmd": "chage -M 90 nombre",
+        "desc": "Fuerza que la contraseña expire cada 90 días.",
+        "flags": "Combinar con <b>-W 7</b> para advertir al usuario 7 días antes del vencimiento."
+      },
+      {
+        "cmd": "usermod -aG sudo nombre",
+        "desc": "Agrega el usuario al grupo <b>sudo</b> para darle privilegios de administrador.",
+        "flags": "<b>-a</b> → append (no reemplaza grupos existentes) · <b>-G</b> → grupo(s) adicionales. Sin <b>-a</b> pierde todos los grupos anteriores.",
+        "warn": "Requiere que el usuario cierre y abra sesión para que el cambio de grupo tome efecto."
+      },
+      {
+        "cmd": "deluser nombre",
+        "desc": "Elimina el usuario pero conserva su directorio home y archivos.",
+        "flags": "Agrega <b>--remove-home</b> para borrar también /home/nombre."
+      },
+      {
+        "cmd": "deluser --remove-home nombre",
+        "desc": "Elimina el usuario y borra su directorio home y buzón de correo.",
+        "danger": true,
+        "warn": "Acción irreversible. Asegurate de hacer backup si el home tiene datos importantes."
+      },
+      {
+        "cmd": "id nombre",
+        "desc": "Muestra UID, GID y todos los grupos a los que pertenece el usuario."
+      },
+      {
+        "cmd": "groups nombre",
+        "desc": "Lista todos los grupos del usuario. Sin argumento muestra los del usuario actual."
+      },
+      {
+        "cmd": "cat /etc/passwd | grep nombre",
+        "desc": "Consulta directa del registro del usuario: home, shell, UID y GID.",
+        "flags": "Formato: <b>nombre:x:UID:GID:comentario:home:shell</b>"
+      },
+      {
+        "cmd": "getent passwd nombre",
+        "desc": "Obtiene info del usuario desde todas las fuentes (local, LDAP, etc). Preferible a leer /etc/passwd directamente."
+      },
+      {
+        "cmd": "last nombre",
+        "desc": "Historial de inicios de sesión del usuario: fecha, hora, IP y duración.",
+        "flags": "Sin argumento muestra todos los usuarios. Combinar con <b>| head -20</b> para limitar salida."
+      },
+      {
+        "cmd": "lastb",
+        "desc": "Muestra intentos de login fallidos. Clave para detectar ataques de fuerza bruta.",
+        "flags": "Lee /var/log/btmp. Requiere sudo."
+      },
+      {
+        "cmd": "who",
+        "desc": "Usuarios con sesión activa en este momento: terminal, fecha y IP de origen."
+      },
+      {
+        "cmd": "w",
+        "desc": "Como <b>who</b> pero más detallado: muestra qué comando está corriendo cada usuario y el load average."
+      },
+      {
+        "cmd": "pkill -KILL -u nombre",
+        "desc": "Mata todos los procesos del usuario de forma inmediata. Útil para cerrar su sesión SSH activa.",
+        "danger": true,
+        "warn": "Cierra la sesión sin aviso. Puede interrumpir procesos críticos si el usuario los estaba corriendo."
+      },
+      {
+        "cmd": "addgroup nombregrupo",
+        "desc": "Crea un nuevo grupo en el sistema."
+      },
+      {
+        "cmd": "usermod -aG nombregrupo nombre",
+        "desc": "Agrega un usuario a un grupo existente sin quitarlo de los demás.",
+        "flags": "<b>-a</b> es fundamental — sin él reemplaza todos los grupos del usuario."
+      },
+      {
+        "cmd": "deluser nombre nombregrupo",
+        "desc": "Remueve al usuario de un grupo específico sin eliminar su cuenta."
+      },
+      {
+        "cmd": "visudo",
+        "desc": "Edita /etc/sudoers de forma segura con validación de sintaxis. Nunca edites sudoers directamente con nano/vim.",
+        "flags": "Para dar sudo solo a comandos específicos: <b>nombre ALL=(ALL) /usr/bin/systemctl</b>",
+        "warn": "Un sudoers mal formado puede bloquear el acceso sudo al sistema completo."
+      },
+      {
+        "cmd": "faillock --user nombre",
+        "desc": "Muestra el conteo de intentos fallidos de autenticación del usuario (requiere PAM con pam_faillock).",
+        "flags": "Archivo de estado en <b>/var/run/faillock/nombre</b>. Muestra timestamp de cada fallo y si la cuenta está bloqueada."
+      },
+      {
+        "cmd": "faillock --user nombre --reset",
+        "desc": "Resetea el contador de intentos fallidos y desbloquea la cuenta bloqueada por pam_faillock.",
+        "flags": "Equivalente moderno de <b>pam_tally2 --reset</b>. Disponible en Ubuntu 22.04+ y Debian 11+."
+      },
+      {
+        "cmd": "faillock --reset",
+        "desc": "Resetea los contadores de intentos fallidos de TODOS los usuarios a la vez.",
+        "warn": "Usar con cuidado en producción: desbloquea todas las cuentas bloqueadas por intentos fallidos."
+      },
+      {
+        "cmd": "pam_tally2 --user nombre",
+        "desc": "Muestra el número de intentos fallidos acumulados (sistemas más antiguos: Ubuntu 20.04 / Debian 10).",
+        "flags": "Deprecado en favor de <b>faillock</b>. En sistemas nuevos puede no estar disponible."
+      },
+      {
+        "cmd": "pam_tally2 --user nombre --reset",
+        "desc": "Resetea el contador de intentos fallidos en sistemas que usan pam_tally2.",
+        "flags": "Requiere sudo. Combinar con <b>usermod -U nombre</b> si la cuenta también fue bloqueada con lock."
+      },
+      {
+        "cmd": "cat /etc/security/faillock.conf",
+        "desc": "Muestra la configuración de pam_faillock: límite de intentos, tiempo de bloqueo y ventana de tiempo.",
+        "flags": "<b>deny = 5</b> → bloquea tras 5 fallos · <b>unlock_time = 600</b> → desbloqueo automático en 10 min · <b>fail_interval = 900</b> → ventana de 15 min"
+      },
+      {
+        "cmd": "grep pam_faillock /etc/pam.d/common-auth",
+        "desc": "Verifica si pam_faillock está activo en la configuración PAM del sistema.",
+        "flags": "Si no aparece, el sistema no tiene habilitado el bloqueo por intentos fallidos."
+      },
+      {
+        "cmd": "grep pam_tally2 /etc/pam.d/common-auth",
+        "desc": "Verifica si pam_tally2 está configurado en el stack PAM (sistemas legacy)."
+      },
+      {
+        "cmd": "ls /var/run/faillock/",
+        "desc": "Lista los archivos de estado de faillock: un archivo por usuario con historial de fallos.",
+        "flags": "Cada archivo es un registro binario — léelo con <b>faillock --user nombre</b>, no con cat."
+      },
+      {
+        "cmd": "rm /var/run/faillock/nombre",
+        "desc": "Elimina manualmente el archivo de estado de faillock para un usuario, reseteando sus intentos.",
+        "flags": "Alternativa de emergencia cuando <b>faillock --reset</b> no está disponible. Requiere sudo.",
+        "warn": "Solo usar si faillock --reset falla. Reinicia completamente el historial del usuario."
+      }
+    ]
   }
 ]
