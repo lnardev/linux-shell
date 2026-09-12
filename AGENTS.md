@@ -20,6 +20,6 @@ Static HTML page (`index.html`) with separate CSS (`styles.css`) and JS (`app.js
 
 ## Gotchas
 - The page fetches js/data.json — it won't render when opened via file://. Serve over HTTP.
-- The footer text `"22 categorías · generado para uso local · sin dependencias externas"` hardcodes the category count. If you add/remove a top-level category in `js/data.json`, update this number manually — it is NOT auto-computed.
+- The footer text `"23 categorías · generado para uso local · sin dependencias externas"` hardcodes the category count. If you add/remove a top-level category in `js/data.json`, update this number manually — it is NOT auto-computed.
 - `cmd` and `desc` strings are escaped via `escapeHtml`/`escapeAttr` before rendering — don't pre-escape them yourself in `DATA`.
 - Search filtering matches against `cmd + ' ' + desc` (lowercased) via `data-search` attribute — keep relevant keywords in `desc` if you want an item discoverable by search.
