@@ -157,6 +157,8 @@ Valida la lógica de `js/core.js`, el catálogo y los playbooks. Para lo visual,
 
 Uso local. Generado como referencia personal.
 
+Licencia MTI
+
 ---
 
 *Hecho con ❤️ para la comunidad de auto-gestión de servidores.*
