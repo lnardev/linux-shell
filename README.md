@@ -1,6 +1,6 @@
 # 🖥️ root@vps — Manual de Autogestión de un VPS
 
-> Página estática HTML autocontenida con +268 comandos de Linux para administrar tu propio servidor. Sin dependencias externas, sin build tools, sin frameworks.
+> Página estática HTML autocontenida con +290 comandos de Linux para administrar tu propio servidor. Sin dependencias externas, sin build tools, sin frameworks.
 
 ## ¿Qué es esto?
 
@@ -27,7 +27,7 @@ open http://localhost:8000   # macOS
 
 - **Búsqueda en tiempo real** — filtrá comandos escribiendo en la barra superior (o presioná `/`)
 - **Copia con un clic** — cada comando tiene un botón "copiar" para pegarlo directo en la terminal
-- **22 categorías** organizadas por tema
+- **23 categorías** organizadas por tema
 - **Sin dependencias** — todo el HTML, CSS y JS vive en un solo archivo
 - **Tema terminal** — modo oscuro y claro con persistencia y preferencia del sistema
 - **Navegación lateral** — TOC sticky con highlight por scroll
@@ -75,6 +75,7 @@ linux-commands/
 | 20 | Bash y configuración de shell | Alias, variables, prompt, historial |
 | 21 | PM2 (gestor de procesos Node.js) | Reinicios, cluster, logs de Node |
 | 22 | Git y despliegue | Clonar, deploy keys, actualizar producción |
+| 23 | Gestión de usuarios | Crear usuarios, grupos, sudoers, bloqueos y auditoría |
 
 ## 🛠️ Cómo editar / contribuir
 
@@ -103,7 +104,7 @@ Cada categoría tiene esta estructura:
 
 - El contenido está en **español** — mantener consistencia
 - **No escapar** `cmd` ni `desc` — el JS lo hace automáticamente con `escapeHtml`/`escapeAttr`
-- Si agregás o quitás una categoría, **actualizá el número en el footer** (`22 categorías · ...`)
+- Si agregás o quitás una categoría, **actualizá el número en el footer** (`23 categorías · ...`)
 - Para que un comando sea buscable, incluí palabras clave en `desc` — el filtro busca en `cmd + desc`
 - Al editar `js/data.json` respetá JSON válido: comillas dobles en claves y strings, sin comas finales, sin comentarios.
 
