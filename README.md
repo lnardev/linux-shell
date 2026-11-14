@@ -123,6 +123,8 @@ No hay tests ni build. Simplemente abrí `index.html` en el browser y verificá 
 
 Uso local. Generado como referencia personal.
 
+Licencia MTI
+
 ---
 
 *Hecho con ❤️ para la comunidad de auto-gestión de servidores.*
