@@ -17,7 +17,7 @@
       },
       {
         "name": "clave_publica",
-        "label": "Clave pública SSH (ssh-ed25519 AAAA...)",
+        "label": "Clave pública SSH (ssh-ed25519)",
         "default": ""
       }
     ],
