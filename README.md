@@ -27,8 +27,11 @@ open http://localhost:8000   # macOS
 
 - **Búsqueda en tiempo real** — filtrá comandos escribiendo en la barra superior (o presioná `/`)
 - **Copia con un clic** — cada comando tiene un botón "copiar" para pegarlo directo en la terminal
-- **23 categorías** organizadas por tema
-- **Sin dependencias** — todo el HTML, CSS y JS vive en un solo archivo
+- **23 categorías** organizadas por tema (el contador del footer se calcula solo)
+- **5 playbooks** — recetas paso a paso (hardening de VPS, deploy Node + PM2 + Nginx + SSL, diagnóstico de servidor lento, swap, backup de MySQL) con variables editables (`usuario`, `dominio`...) que se aplican a todos los comandos, progreso por paso y botón *copiar como script* (los pasos peligrosos salen comentados)
+- **Enlaces directos** — `#pb-<id>` para un playbook, `#c-<categoria>-<n>` para un comando (botón *enlace* en cada tarjeta)
+- **HTML saneado** — solo se permiten `<b>`, `<i>`, `<code>` y `<br>` en los textos del JSON
+- **Sin dependencias** — HTML, CSS y JS planos, sin build ni paquetes
 - **Tema terminal** — modo oscuro y claro con persistencia y preferencia del sistema
 - **Navegación lateral** — TOC sticky con highlight por scroll
 - **Warnings visuales** — comandos destructivos marcados en rojo con advertencias
@@ -40,8 +43,12 @@ open http://localhost:8000   # macOS
 linux-commands/
 ├── index.html      ← Página principal (estructura HTML)
 ├── css/styles.css  ← Estilos (tema terminal)
-├── js/app.js       ← Datos (array DATA) + lógica de renderizado
-├── js/data.json     ← Contenido de la cheatsheet (datos)
+├── js/app.js          ← Carga de datos, render del catálogo, búsqueda y enlaces directos
+├── js/core.js         ← Lógica pura (saneado, variables, validación, script); testeable en Node
+├── js/playbooks-ui.js ← Render e interacción de los playbooks
+├── js/data.json       ← Catálogo de comandos
+├── js/playbooks.json  ← Playbooks paso a paso
+├── tests/             ← Tests con `node --test`
 ├── README.md
 ├── AGENTS.md
 └── CLAUDE.md
@@ -100,17 +107,44 @@ Cada categoría tiene esta estructura:
 }
 ```
 
+### Playbooks (`js/playbooks.json`)
+
+```javascript
+{
+  id: "slug-unico",            // no puede coincidir con el id de una categoría
+  title: "Nombre del playbook",
+  desc: "Qué logra y qué requiere",
+  time: "15 min",              // opcional
+  vars: [{ name: "usuario", label: "Usuario sudo", default: "deploy" }],
+  steps: [
+    {
+      title: "Crear usuario",
+      cmd: "adduser {{usuario}}",   // {{var}} debe estar declarada en vars
+      desc: "Qué hace el paso",
+      warn: "Texto del riesgo",     // obligatorio si danger es true
+      danger: true                  // opcional
+    }
+  ]
+}
+```
+
+Nunca pongas contraseñas ni claves como valor por defecto: los valores se guardan en el `localStorage` del navegador.
+
 ### Reglas al editar
 
 - El contenido está en **español** — mantener consistencia
-- **No escapar** `cmd` ni `desc` — el JS lo hace automáticamente con `escapeHtml`/`escapeAttr`
-- Si agregás o quitás una categoría, **actualizá el número en el footer** (`23 categorías · ...`)
-- Para que un comando sea buscable, incluí palabras clave en `desc` — el filtro busca en `cmd + desc`
+- **No escapar** `cmd` — el JS lo hace con `escapeHtml`/`escapeAttr`. `desc`, `flags` y `warn` aceptan solo `<b>`, `<i>`, `<code>` y `<br>` (sin atributos); cualquier otra etiqueta se muestra como texto
+- El contador de categorías del footer es automático: no hace falta tocarlo
+- Para que un comando sea buscable, incluí palabras clave en `desc` o `flags` — el filtro busca en `cmd + desc + flags` (sin etiquetas)
 - Al editar `js/data.json` respetá JSON válido: comillas dobles en claves y strings, sin comas finales, sin comentarios.
 
 ## 🧪 Verificación
 
-No hay tests ni build. Simplemente abrí `index.html` en el browser y verificá visualmente que todo se vea bien.
+```
+node --test
+```
+
+Valida la lógica de `js/core.js`, el catálogo y los playbooks. Para lo visual, serví la carpeta (`python3 -m http.server 8000`) y revisá en el navegador. No hay build ni dependencias: `package.json` solo declara `type: module` y el script `test`.
 
 ## Stack
 

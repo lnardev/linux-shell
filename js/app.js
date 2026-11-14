@@ -1,5 +1,5 @@
-function escapeHtml(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
-function escapeAttr(s){return s.replace(/&/g,'&amp;').replace(/"/g,'&quot;');}
+import { escapeHtml, escapeAttr, sanitizeInline, searchText, validatePlaybooks, parseHash } from './core.js';
+import { renderPlaybooks } from './playbooks-ui.js';
 
 // theme toggle (independiente de la carga de datos)
 const themeToggle = document.getElementById('theme-toggle');
@@ -25,13 +25,28 @@ async function init(){
     return;
   }
 
+  const catCount = document.getElementById('cat-count');
+  if(catCount) catCount.textContent = String(DATA.length);
+
   const toc = document.getElementById('toc');
   const content = document.getElementById('content');
+
+  let playbooks = [];
+  try{
+    const res = await fetch('./js/playbooks.json');
+    if(res.ok) playbooks = await res.json();
+  }catch(e){ playbooks = []; }
+  const pbErrors = validatePlaybooks(playbooks);
+  if(pbErrors.length){
+    content.insertAdjacentHTML('beforeend', '<div class="empty-state" style="display:block">⚠ playbooks.json inválido: ' + escapeHtml(pbErrors[0]) + '</div>');
+  }else{
+    renderPlaybooks(playbooks, toc, content);
+  }
 
   DATA.forEach((cat, i)=>{
     const a = document.createElement('a');
     a.href = '#'+cat.id;
-    a.innerHTML = `<span class="n">${String(i+1).padStart(2,'0')}</span> ${cat.title}`;
+    a.innerHTML = `<span class="n">${String(i+1).padStart(2,'0')}</span> ${escapeHtml(cat.title)}`;
     a.dataset.target = cat.id;
     toc.appendChild(a);
 
@@ -39,24 +54,26 @@ async function init(){
     sec.className = 'cat';
     sec.id = cat.id;
     sec.innerHTML = `
-      <div class="cat-head"><span class="cat-num">${String(i+1).padStart(2,'0')}</span><h2>${cat.title}</h2></div>
-      <p class="cat-desc">${cat.desc}</p>
+      <div class="cat-head"><span class="cat-num">${String(i+1).padStart(2,'0')}</span><h2>${sanitizeInline(cat.title)}</h2></div>
+      <p class="cat-desc">${sanitizeInline(cat.desc)}</p>
       <div class="grid"></div>
     `;
     const grid = sec.querySelector('.grid');
-    cat.items.forEach(item=>{
+    cat.items.forEach((item, n)=>{
       const card = document.createElement('div');
       card.className = 'card' + (item.danger ? ' danger' : '');
-      card.dataset.search = (item.cmd + ' ' + item.desc).toLowerCase();
+      card.id = `c-${cat.id}-${n+1}`;
+      card.dataset.search = searchText(item);
       card.innerHTML = `
         <div class="cmdline">
           <span class="prompt">$</span>
           <code>${escapeHtml(item.cmd)}</code>
           <button class="copybtn" data-cmd="${escapeAttr(item.cmd)}">copiar</button>
+          <button class="copybtn linkbtn" type="button" title="Copiar enlace a este comando" aria-label="Copiar enlace a este comando">enlace</button>
         </div>
-        <p>${item.desc}</p>
-        ${item.flags ? `<div class="flags">${item.flags}</div>` : ''}
-        ${item.warn ? `<div class="warn">⚠ ${item.warn}</div>` : ''}
+        <p>${sanitizeInline(item.desc)}</p>
+        ${item.flags ? `<div class="flags">${sanitizeInline(item.flags)}</div>` : ''}
+        ${item.warn ? `<div class="warn">⚠ ${sanitizeInline(item.warn)}</div>` : ''}
       `;
       grid.appendChild(card);
     });
@@ -67,7 +84,9 @@ async function init(){
   content.addEventListener('click', e=>{
     const btn = e.target.closest('.copybtn');
     if(!btn) return;
-    const text = btn.getAttribute('data-cmd');
+    const text = btn.classList.contains('linkbtn')
+      ? location.origin + location.pathname + '#' + btn.closest('.card').id
+      : btn.getAttribute('data-cmd');
     navigator.clipboard.writeText(text).then(()=>{
       const original = btn.textContent;
       btn.textContent = '✓ copiado';
@@ -94,8 +113,24 @@ async function init(){
     if(e.key === '/' && document.activeElement !== search){ e.preventDefault(); search.focus(); }
   });
 
+  // deep links: scroll to and flash the target once content exists
+  const goToHash = ()=>{
+    const target = parseHash(location.hash, DATA, playbooks);
+    if(!target) return;
+    const id = target.type === 'playbook' ? 'pb-' + target.id
+      : target.type === 'command' ? `c-${target.cat}-${target.index + 1}` : target.id;
+    const el = document.getElementById(id);
+    if(!el) return;
+    el.scrollIntoView({block:'start'});
+    el.classList.remove('flash');
+    void el.offsetWidth;
+    el.classList.add('flash');
+  };
+  goToHash();
+  window.addEventListener('hashchange', goToHash);
+
   // active toc highlight on scroll
-  const sections = document.querySelectorAll('section.cat');
+  const sections = document.querySelectorAll('section.cat, section.pb');
   const tocLinks = toc.querySelectorAll('a');
   const obs = new IntersectionObserver((entries)=>{
     entries.forEach(entry=>{
