@@ -1,0 +1,8 @@
+{
+  "name": "linux-shell",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test"
+  }
+}

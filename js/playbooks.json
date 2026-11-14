@@ -1,0 +1,397 @@
+[
+  {
+    "id": "hardening",
+    "title": "Hardening de un VPS nuevo",
+    "time": "15 min",
+    "desc": "Primeros pasos en un servidor recién creado: usuario sudo, acceso solo por llave SSH, firewall, fail2ban y actualizaciones automáticas. Ejecutalo como <b>root</b> salvo que el paso indique lo contrario.",
+    "vars": [
+      {
+        "name": "usuario",
+        "label": "Usuario sudo",
+        "default": "deploy"
+      },
+      {
+        "name": "host",
+        "label": "IP o dominio del VPS",
+        "default": ""
+      },
+      {
+        "name": "clave_publica",
+        "label": "Clave pública SSH (ssh-ed25519 AAAA...)",
+        "default": ""
+      }
+    ],
+    "steps": [
+      {
+        "title": "Actualizar el sistema",
+        "cmd": "apt update && apt upgrade -y",
+        "desc": "Instala los parches de seguridad pendientes antes de configurar nada."
+      },
+      {
+        "title": "Crear el usuario administrador",
+        "cmd": "adduser {{usuario}}",
+        "desc": "Pide una contraseña y datos opcionales. Este usuario reemplaza a root en el uso diario."
+      },
+      {
+        "title": "Darle permisos sudo",
+        "cmd": "usermod -aG sudo {{usuario}}",
+        "desc": "Lo agrega al grupo <b>sudo</b>."
+      },
+      {
+        "title": "Instalar tu clave SSH",
+        "cmd": "install -d -m 700 -o {{usuario}} -g {{usuario}} /home/{{usuario}}/.ssh && echo '{{clave_publica}}' >> /home/{{usuario}}/.ssh/authorized_keys && chown {{usuario}}:{{usuario}} /home/{{usuario}}/.ssh/authorized_keys && chmod 600 /home/{{usuario}}/.ssh/authorized_keys",
+        "desc": "Pega tu clave pública en la variable. Generala en tu equipo con <code>ssh-keygen -t ed25519</code>."
+      },
+      {
+        "title": "Probar el acceso con llave (desde TU equipo)",
+        "cmd": "ssh {{usuario}}@{{host}}",
+        "desc": "Abrí otra terminal local y confirmá que entrás sin contraseña. No sigas hasta que funcione."
+      },
+      {
+        "title": "Desactivar root y contraseñas en SSH",
+        "cmd": "sed -i 's/^#\\?PermitRootLogin.*/PermitRootLogin no/; s/^#\\?PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config && sshd -t && systemctl reload ssh",
+        "desc": "Valida la sintaxis con <code>sshd -t</code> antes de recargar. En Ubuntu 22.04+ revisá también <b>/etc/ssh/sshd_config.d/*.conf</b>, que puede pisar estos valores.",
+        "warn": "Si el paso anterior no funcionó te quedás sin acceso al servidor. Mantené abierta la sesión actual hasta confirmar que podés entrar en otra.",
+        "danger": true
+      },
+      {
+        "title": "Permitir SSH y web en el firewall",
+        "cmd": "ufw allow OpenSSH && ufw allow 80,443/tcp",
+        "desc": "Abre solo SSH, HTTP y HTTPS. Todo lo demás seguirá bloqueado."
+      },
+      {
+        "title": "Activar el firewall",
+        "cmd": "ufw --force enable",
+        "desc": "Activa UFW sin pedir confirmación.",
+        "warn": "Activalo solo después de permitir SSH en el paso anterior o cortás tu propia conexión.",
+        "danger": true
+      },
+      {
+        "title": "Instalar fail2ban",
+        "cmd": "apt install -y fail2ban && systemctl enable --now fail2ban",
+        "desc": "Bloquea IPs que fallan el login SSH repetidamente."
+      },
+      {
+        "title": "Activar actualizaciones automáticas de seguridad",
+        "cmd": "apt install -y unattended-upgrades && dpkg-reconfigure -plow unattended-upgrades",
+        "desc": "Responde <b>Sí</b> en el diálogo que aparece."
+      },
+      {
+        "title": "Verificar el resultado",
+        "cmd": "ufw status verbose && fail2ban-client status sshd",
+        "desc": "Confirma reglas activas y la jaula SSH de fail2ban funcionando."
+      }
+    ]
+  },
+  {
+    "id": "deploy-node",
+    "title": "Deploy de Node.js con PM2, Nginx y SSL",
+    "time": "20 min",
+    "desc": "Publica una app Node.js detrás de Nginx con HTTPS gratuito (Let's Encrypt). Requiere un usuario con sudo y un dominio apuntando a la IP del VPS.",
+    "vars": [
+      {
+        "name": "app",
+        "label": "Nombre de la app",
+        "default": "miapp"
+      },
+      {
+        "name": "dominio",
+        "label": "Dominio",
+        "default": "ejemplo.com"
+      },
+      {
+        "name": "puerto",
+        "label": "Puerto interno de la app",
+        "default": "3000"
+      },
+      {
+        "name": "repo",
+        "label": "URL del repositorio Git",
+        "default": ""
+      }
+    ],
+    "steps": [
+      {
+        "title": "Instalar Node.js LTS",
+        "cmd": "curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash - && sudo apt install -y nodejs",
+        "desc": "Instala la versión LTS desde NodeSource.",
+        "warn": "Descarga y ejecuta un script remoto con privilegios. Revisalo antes en https://deb.nodesource.com/setup_lts.x si no confiás en la fuente."
+      },
+      {
+        "title": "Clonar e instalar dependencias",
+        "cmd": "git clone {{repo}} ~/{{app}} && cd ~/{{app}} && npm ci --omit=dev",
+        "desc": "Usa <code>npm ci</code> para instalar exactamente lo del lockfile."
+      },
+      {
+        "title": "Instalar PM2",
+        "cmd": "sudo npm install -g pm2",
+        "desc": "Gestor de procesos que reinicia la app si cae."
+      },
+      {
+        "title": "Arrancar la app con PM2",
+        "cmd": "cd ~/{{app}} && pm2 start npm --name {{app}} -- start && pm2 save",
+        "desc": "Ejecuta el script <b>start</b> de tu package.json. Tu app debe escuchar en el puerto indicado."
+      },
+      {
+        "title": "Arrancar PM2 al reiniciar el servidor",
+        "cmd": "pm2 startup systemd",
+        "desc": "Imprime un comando con <b>sudo</b>: copialo y ejecutalo para registrar el servicio."
+      },
+      {
+        "title": "Instalar Nginx",
+        "cmd": "sudo apt install -y nginx",
+        "desc": "Servidor web que hará de proxy inverso."
+      },
+      {
+        "title": "Crear el sitio de Nginx",
+        "cmd": "sudo tee /etc/nginx/sites-available/{{dominio}} > /dev/null <<'EOF'\nserver {\n    listen 80;\n    server_name {{dominio}};\n    location / {\n        proxy_pass http://127.0.0.1:{{puerto}};\n        proxy_http_version 1.1;\n        proxy_set_header Host $host;\n        proxy_set_header X-Real-IP $remote_addr;\n        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n        proxy_set_header X-Forwarded-Proto $scheme;\n        proxy_set_header Upgrade $http_upgrade;\n        proxy_set_header Connection \"upgrade\";\n    }\n}\nEOF",
+        "desc": "Reenvía el tráfico del dominio al puerto interno, con soporte de WebSockets."
+      },
+      {
+        "title": "Activar el sitio y recargar",
+        "cmd": "sudo ln -s /etc/nginx/sites-available/{{dominio}} /etc/nginx/sites-enabled/ && sudo nginx -t && sudo systemctl reload nginx",
+        "desc": "<code>nginx -t</code> valida la configuración antes de recargar."
+      },
+      {
+        "title": "Abrir HTTP/HTTPS en el firewall",
+        "cmd": "sudo ufw allow 'Nginx Full'",
+        "desc": "Permite los puertos 80 y 443."
+      },
+      {
+        "title": "Emitir el certificado SSL",
+        "cmd": "sudo apt install -y certbot python3-certbot-nginx && sudo certbot --nginx -d {{dominio}} --redirect",
+        "desc": "Certbot edita Nginx y redirige HTTP a HTTPS. El dominio ya debe resolver a este servidor."
+      },
+      {
+        "title": "Probar la renovación automática",
+        "cmd": "sudo certbot renew --dry-run",
+        "desc": "Simula la renovación sin emitir un certificado real."
+      },
+      {
+        "title": "Verificar el sitio",
+        "cmd": "curl -I https://{{dominio}}",
+        "desc": "Debe responder <b>200</b> o la respuesta de tu app."
+      }
+    ]
+  },
+  {
+    "id": "servidor-lento",
+    "title": "Diagnóstico de servidor lento",
+    "time": "10 min",
+    "desc": "Recorrido de solo lectura para encontrar el cuello de botella: CPU, memoria, disco, red o un proceso descontrolado. No modifica nada.",
+    "vars": [],
+    "steps": [
+      {
+        "title": "Ver la carga promedio",
+        "cmd": "uptime",
+        "desc": "Los tres números son la carga de 1, 5 y 15 min. Compará con la cantidad de núcleos (<code>nproc</code>)."
+      },
+      {
+        "title": "Ver procesos y consumo en vivo",
+        "cmd": "top -bn1 | head -15",
+        "desc": "Fijate en la línea <b>%Cpu(s)</b>: <b>wa</b> alto indica espera de disco."
+      },
+      {
+        "title": "Top procesos por CPU",
+        "cmd": "ps aux --sort=-%cpu | head -10",
+        "desc": "Identifica al proceso que más procesador consume."
+      },
+      {
+        "title": "Top procesos por memoria",
+        "cmd": "ps aux --sort=-%mem | head -10",
+        "desc": "Identifica fugas de memoria o procesos pesados."
+      },
+      {
+        "title": "Revisar memoria y swap",
+        "cmd": "free -h",
+        "desc": "Si <b>available</b> es muy bajo y la swap está llena, falta RAM."
+      },
+      {
+        "title": "Actividad de memoria y swap",
+        "cmd": "vmstat 1 5",
+        "desc": "Columnas <b>si/so</b> distintas de cero sostenidas significan que el sistema está intercambiando a disco."
+      },
+      {
+        "title": "Espacio en disco e inodos",
+        "cmd": "df -h && df -i",
+        "desc": "Un disco al 100% (o sin inodos libres) provoca fallos extraños."
+      },
+      {
+        "title": "Carpetas que más ocupan",
+        "cmd": "sudo du -xh / --max-depth=1 2>/dev/null | sort -h | tail",
+        "desc": "Ubica qué directorio de primer nivel llena el disco."
+      },
+      {
+        "title": "Latencia de disco",
+        "cmd": "iostat -x 1 3",
+        "desc": "Requiere <code>sudo apt install sysstat</code>. <b>%util</b> cerca de 100 indica disco saturado."
+      },
+      {
+        "title": "Puertos y conexiones abiertas",
+        "cmd": "sudo ss -tulpn",
+        "desc": "Muestra qué proceso escucha en cada puerto."
+      },
+      {
+        "title": "Errores recientes del sistema",
+        "cmd": "sudo journalctl -p err -b --no-pager | tail -50",
+        "desc": "Errores desde el último arranque."
+      },
+      {
+        "title": "Buscar procesos matados por falta de memoria",
+        "cmd": "sudo dmesg -T | grep -i -E 'out of memory|killed process' | tail",
+        "desc": "Si aparecen líneas, el kernel terminó procesos por OOM."
+      }
+    ]
+  },
+  {
+    "id": "swap-vps",
+    "title": "Crear swap en un VPS con poca RAM",
+    "time": "5 min",
+    "desc": "Agrega un archivo de swap persistente y ajusta la agresividad con la que el kernel lo usa. Útil en VPS de 1–2 GB de RAM.",
+    "vars": [
+      {
+        "name": "tamano",
+        "label": "Tamaño del swap",
+        "default": "2G"
+      },
+      {
+        "name": "swappiness",
+        "label": "Swappiness (0–100)",
+        "default": "10"
+      }
+    ],
+    "steps": [
+      {
+        "title": "Ver si ya existe swap",
+        "cmd": "swapon --show && free -h",
+        "desc": "Si <b>swapon --show</b> no imprime nada, no hay swap activa."
+      },
+      {
+        "title": "Reservar el archivo",
+        "cmd": "sudo fallocate -l {{tamano}} /swapfile",
+        "desc": "Crea <b>/swapfile</b>. En btrfs o ZFS usá <code>dd</code> en lugar de fallocate."
+      },
+      {
+        "title": "Restringir permisos",
+        "cmd": "sudo chmod 600 /swapfile",
+        "desc": "Solo root debe poder leerlo."
+      },
+      {
+        "title": "Formatear como swap",
+        "cmd": "sudo mkswap /swapfile",
+        "desc": "Prepara el archivo como área de intercambio."
+      },
+      {
+        "title": "Activar",
+        "cmd": "sudo swapon /swapfile",
+        "desc": "Disponible de inmediato, pero aún no persiste al reiniciar."
+      },
+      {
+        "title": "Hacerlo permanente",
+        "cmd": "echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab",
+        "desc": "Registra el swap en el arranque.",
+        "warn": "Ejecutalo una sola vez: repetirlo duplica la línea en /etc/fstab."
+      },
+      {
+        "title": "Ajustar swappiness",
+        "cmd": "echo 'vm.swappiness={{swappiness}}' | sudo tee /etc/sysctl.d/99-swappiness.conf && sudo sysctl --system",
+        "desc": "Valores bajos (10) priorizan RAM; el defecto es 60."
+      },
+      {
+        "title": "Verificar",
+        "cmd": "swapon --show && cat /proc/sys/vm/swappiness",
+        "desc": "Debe mostrar el swap activo y el valor de swappiness configurado."
+      }
+    ]
+  },
+  {
+    "id": "backup-mysql",
+    "title": "Backup automático de MySQL con cron y rsync",
+    "time": "20 min",
+    "desc": "Dump comprimido diario de una base de datos, rotación por antigüedad y copia a un servidor remoto. Las credenciales van en <b>/root/.my.cnf</b>, nunca en la línea de comandos.",
+    "vars": [
+      {
+        "name": "db",
+        "label": "Base de datos",
+        "default": "mibase"
+      },
+      {
+        "name": "usuario_db",
+        "label": "Usuario de MySQL con permiso de lectura",
+        "default": "backup"
+      },
+      {
+        "name": "dir",
+        "label": "Directorio de backups",
+        "default": "/var/backups/mysql"
+      },
+      {
+        "name": "retencion",
+        "label": "Días a conservar",
+        "default": "7"
+      },
+      {
+        "name": "usuario_remoto",
+        "label": "Usuario del servidor remoto",
+        "default": ""
+      },
+      {
+        "name": "host_remoto",
+        "label": "Host del servidor remoto",
+        "default": ""
+      }
+    ],
+    "steps": [
+      {
+        "title": "Crear el directorio de backups",
+        "cmd": "sudo mkdir -p {{dir}} && sudo chmod 700 {{dir}}",
+        "desc": "Solo root podrá leer los dumps."
+      },
+      {
+        "title": "Guardar las credenciales de MySQL",
+        "cmd": "sudo install -m 600 /dev/null /root/.my.cnf && sudo nano /root/.my.cnf",
+        "desc": "Escribí el contenido: <code>[client]</code>, luego <code>user={{usuario_db}}</code> y <code>password=TU_CLAVE</code> en líneas separadas. Guardá con Ctrl+O."
+      },
+      {
+        "title": "Probar un dump manual",
+        "cmd": "sudo sh -c 'mysqldump --defaults-file=/root/.my.cnf --single-transaction {{db}} | gzip > {{dir}}/{{db}}-$(date +%F).sql.gz'",
+        "desc": "<b>--single-transaction</b> da un dump consistente en InnoDB sin bloquear tablas."
+      },
+      {
+        "title": "Verificar que el archivo es válido",
+        "cmd": "sudo gunzip -t {{dir}}/{{db}}-$(date +%F).sql.gz && echo OK",
+        "desc": "Imprime <b>OK</b> si el comprimido está íntegro."
+      },
+      {
+        "title": "Crear el script de backup",
+        "cmd": "sudo tee /usr/local/bin/backup-mysql.sh > /dev/null <<'EOF'\n#!/usr/bin/env bash\nset -euo pipefail\nmysqldump --defaults-file=/root/.my.cnf --single-transaction {{db}} | gzip > {{dir}}/{{db}}-$(date +%F).sql.gz\nfind {{dir}} -name '{{db}}-*.sql.gz' -mtime +{{retencion}} -delete\nEOF",
+        "desc": "Hace el dump y borra los más viejos que los días de retención."
+      },
+      {
+        "title": "Hacerlo ejecutable",
+        "cmd": "sudo chmod 700 /usr/local/bin/backup-mysql.sh",
+        "desc": "Solo root puede ejecutarlo."
+      },
+      {
+        "title": "Programar en cron (todos los días 03:00)",
+        "cmd": "( sudo crontab -l 2>/dev/null; echo '0 3 * * * /usr/local/bin/backup-mysql.sh >> /var/log/backup-mysql.log 2>&1' ) | sudo crontab -",
+        "desc": "Conserva las tareas existentes y agrega la nueva.",
+        "warn": "Ejecutalo una sola vez: repetirlo duplica la tarea en el crontab."
+      },
+      {
+        "title": "Copiar los backups al servidor remoto",
+        "cmd": "sudo rsync -az --delete-after -e ssh {{dir}}/ {{usuario_remoto}}@{{host_remoto}}:/backups/{{db}}/",
+        "desc": "Sincroniza por SSH con las llaves de root. Probalo a mano antes de automatizarlo.",
+        "warn": "<b>--delete-after</b> borra en el remoto lo que ya no exista en el origen. Un destino equivocado destruye archivos.",
+        "danger": true
+      },
+      {
+        "title": "Restaurar un backup (solo emergencia)",
+        "cmd": "gunzip < {{dir}}/{{db}}-FECHA.sql.gz | mysql --defaults-file=/root/.my.cnf {{db}}",
+        "desc": "Reemplazá <b>FECHA</b> por el día a restaurar (AAAA-MM-DD). Ejecutalo como root.",
+        "warn": "Sobrescribe los datos actuales de la base. Probalo primero sobre una base de prueba.",
+        "danger": true
+      }
+    ]
+  }
+]
